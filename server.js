@@ -73,14 +73,14 @@ peers.on("connection", async (socket) => {
 
   router = await worker.createRouter({ mediaCodecs });
 
-  socket.on("getRtpCapabilites", (callback) => {
+  socket.on("getRtpCapabilities", (callback) => {
     const rtpCapabilities = router.rtpCapabilities;
     console.log("rtp capabilities", rtpCapabilities);
 
     callback({ rtpCapabilities });
   });
 
-  socket.on("createSendTransport", async ({ sender }, callback) => {
+  socket.on("createWebRtcTransport", async ({ sender }, callback) => {
     console.log(`Is this a sender request? ${sender}`);
     if (sender) {
       producerTransport = await createWebRtcTransport(callback);
@@ -89,7 +89,7 @@ peers.on("connection", async (socket) => {
     }
   });
 
-  socket.on("transport-conect", async ({ dtlsParameters }) => {
+  socket.on("transport-connect", async ({ dtlsParameters }) => {
     console.log("DTLS Params...", { dtlsParameters });
     await producerTransport.connect({ dtlsParameters });
   });
@@ -165,52 +165,51 @@ peers.on("connection", async (socket) => {
     console.log("consumer resume");
     await consumer.resume();
   });
-
-  const createWebRtcTransport = async (callback) => {
-    try {
-      const webRtcTransport_options = {
-        listenIps: [
-          {
-            ip: "0.0.0.0",
-            announcedIp: "127.0.0.1",
-          },
-        ],
-        enableUdp: true,
-        enableTcp: true,
-        preferUdp: true,
-      };
-
-      let transport = await router.createWebRtcTransport(
-        webRtcTransport_options
-      );
-
-      transport.on("dtlsstatechange", (dtlsState) => {
-        if (dtlsState === "closed") {
-          transport.close();
-        }
-      });
-
-      transport.on("close", () => {
-        console.log("transport closed");
-      });
-
-      callback({
-        params: {
-          id: transport.id,
-          iceParameters: transport.iceParameters,
-          iceCandidates: transport.iceCandidates,
-          dtlsParameters: transport.dtlsParameters,
-        },
-      });
-
-      return transport;
-    } catch (error) {
-      console.log(error);
-      callback({
-        params: {
-          error: error,
-        },
-      });
-    }
-  };
 });
+
+const createWebRtcTransport = async (callback) => {
+  try {
+    const webRtcTransport_options = {
+      listenIps: [
+        {
+          ip: "0.0.0.0",
+          announcedIp: "127.0.0.1",
+        },
+      ],
+      enableUdp: true,
+      enableTcp: true,
+      preferUdp: true,
+    };
+
+    let transport = await router.createWebRtcTransport(webRtcTransport_options);
+    console.log(`transport id: ${transport.id}`);
+
+    transport.on("dtlsstatechange", (dtlsState) => {
+      if (dtlsState === "closed") {
+        transport.close();
+      }
+    });
+
+    transport.on("close", () => {
+      console.log("transport closed");
+    });
+
+    callback({
+      params: {
+        id: transport.id,
+        iceParameters: transport.iceParameters,
+        iceCandidates: transport.iceCandidates,
+        dtlsParameters: transport.dtlsParameters,
+      },
+    });
+
+    return transport;
+  } catch (error) {
+    console.log(error);
+    callback({
+      params: {
+        error: error,
+      },
+    });
+  }
+};

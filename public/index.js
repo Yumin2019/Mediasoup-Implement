@@ -12,6 +12,7 @@ let producerTransport;
 let consumerTransport;
 let producer;
 let consumer;
+
 let params = {
   encodings: [
     {
@@ -84,7 +85,7 @@ const createDevice = async () => {
 };
 
 const getRtpCapabilities = () => {
-  socket.emit("getRtpCapabilites", (data) => {
+  socket.emit("getRtpCapabilities", (data) => {
     console.log(`Router RTP Capabilites ... ${data.rtpCapabilities}`);
 
     rtpCapabilities = data.rtpCapabilities;
@@ -92,7 +93,7 @@ const getRtpCapabilities = () => {
 };
 
 const createSendTransport = () => {
-  socket.emit("createSendTransport", { sender: true }, ({ params }) => {
+  socket.emit("createWebRtcTransport", { sender: true }, ({ params }) => {
     if (params.error) {
       console.log(params.error);
       return;
@@ -151,30 +152,34 @@ const connectSendTransport = async () => {
 };
 
 const createRecvTransport = async () => {
-  await socket.emit("createSendTransport", { sender: false }, ({ params }) => {
-    if (params.error) {
-      console.log(params.error);
-      return;
-    }
-
-    console.log(params);
-
-    consumerTransport = device.createRecvTransport(params);
-    consumerTransport.on(
-      "connect",
-      async ({ dtlsParameters }, callback, errback) => {
-        try {
-          await socket.emit("transport-recv-connect", {
-            dtlsParameters,
-          });
-
-          callback();
-        } catch (error) {
-          errback(error);
-        }
+  await socket.emit(
+    "createWebRtcTransport",
+    { sender: false },
+    ({ params }) => {
+      if (params.error) {
+        console.log(params.error);
+        return;
       }
-    );
-  });
+
+      console.log(params);
+
+      consumerTransport = device.createRecvTransport(params);
+      consumerTransport.on(
+        "connect",
+        async ({ dtlsParameters }, callback, errback) => {
+          try {
+            await socket.emit("transport-recv-connect", {
+              dtlsParameters,
+            });
+
+            callback();
+          } catch (error) {
+            errback(error);
+          }
+        }
+      );
+    }
+  );
 };
 
 const connectRecvTransport = async () => {
