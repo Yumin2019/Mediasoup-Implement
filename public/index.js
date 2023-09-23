@@ -2,8 +2,8 @@ const io = require("socket.io-client");
 const mediasoupClient = require("mediasoup-client");
 const socket = io("/mediasoup");
 
-socket.on("connection-success", (socketId) => {
-  console.log(socketId);
+socket.on("connection-success", (socketId, existsProducer) => {
+  console.log(socketId, existsProducer);
 });
 
 let device;
@@ -12,6 +12,7 @@ let producerTransport;
 let consumerTransport;
 let producer;
 let consumer;
+let isProducer;
 
 let params = {
   encodings: [
@@ -43,11 +44,13 @@ const streamSuccess = async (stream) => {
     track,
     ...params,
   };
+
+  goConnect(true);
 };
 
 const getLocalStream = () => {
-  navigator.getUserMedia(
-    {
+  navigator.mediaDevices
+    .getUserMedia({
       audio: false,
       video: {
         width: {
@@ -59,12 +62,24 @@ const getLocalStream = () => {
           max: 1080,
         },
       },
-    },
-    streamSuccess,
-    (error) => {
+    })
+    .then(streamSuccess)
+    .catch((error) => {
       console.log(error.message);
-    }
-  );
+    });
+};
+
+const goConsume = () => {
+  goConnect(false);
+};
+
+const goConnect = (producerOrConsumer) => {
+  isProducer = producerOrConsumer;
+  device === undefined ? getRtpCapabilities() : goCreateTransport();
+};
+
+const goCreateTransport = () => {
+  isProducer ? createSendTransport() : createRecvTransport();
 };
 
 const createDevice = async () => {
@@ -75,7 +90,8 @@ const createDevice = async () => {
       routerRtpCapabilities: rtpCapabilities,
     });
 
-    console.log("device created");
+    console.log("Device Rtp Capabilities", device.rtpCapabilities);
+    goCreateTransport();
   } catch (error) {
     console.log(error);
     if (error.name === "UnsupportedError") {
@@ -85,10 +101,11 @@ const createDevice = async () => {
 };
 
 const getRtpCapabilities = () => {
-  socket.emit("getRtpCapabilities", (data) => {
+  socket.emit("createRoom", (data) => {
     console.log(`Router RTP Capabilites ... ${data.rtpCapabilities}`);
 
     rtpCapabilities = data.rtpCapabilities;
+    createDevice();
   });
 };
 
@@ -136,6 +153,8 @@ const createSendTransport = () => {
         errback(error);
       }
     });
+
+    connectSendTransport();
   });
 };
 
@@ -178,6 +197,8 @@ const createRecvTransport = async () => {
           }
         }
       );
+
+      connectRecvTransport();
     }
   );
 };
@@ -214,9 +235,4 @@ const connectRecvTransport = async () => {
 };
 
 btnLocalVideo.addEventListener("click", getLocalStream);
-btnRtpCapabilities.addEventListener("click", getRtpCapabilities);
-btnDevice.addEventListener("click", createDevice);
-btnCreateSendTransport.addEventListener("click", createSendTransport);
-btnConnectSendTransport.addEventListener("click", connectSendTransport);
-btnRecvSendTransport.addEventListener("click", createRecvTransport);
-btnConnectRecvTransport.addEventListener("click", connectRecvTransport);
+btnRecvSendTransport.addEventListener("click", goConsume);
